@@ -12,7 +12,7 @@ int response_http(struct bufferevent *bev, const char *method, char *path)
 
 		if (strcmp(path, "/") == 0 || strcmp(path, "/.") == 0)
 			file_path = "./";
-		printf("***** http Request Resource Path =  %s, pf = %s\n", path, file_path);
+		printf("Http Request Resource Path =  %s, File_path = %s\n", path, file_path);
 
 		struct stat fs;	// fileStatus 存储文件或目录的状态信息
 		if (stat(file_path, &fs) < 0) {
@@ -99,7 +99,7 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 		strencode(encode_name, sizeof(encode_name), dirinfo[i]->d_name);
 	
 		sprintf(path, "%s%s", dirname, dirinfo[i]->d_name);	// 目录的路径+目录中的文件名
-		printf("############# path = %s\n", path);
+		printf("Path = %s\n", path);
 
 		if (lstat(path, &fs) < 0) {	// 获取文件或符号链接的元数据
 			sprintf(buf + strlen(buf),
@@ -124,33 +124,33 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 	sprintf(buf+strlen(buf), "</table></body></html>");
 	bufferevent_write(bev, buf, strlen(buf));
 
-	printf("################# Dir Read OK !!!!!!!!!!!!!!\n");
+	printf("Dir Read OK !!!!!!!!!!!!!!\n");
 
 	return 0;
 }
 
 void conn_readcd(struct bufferevent *bev, void *user_data)
 {
-	printf("******************** begin call %s.........\n",__FUNCTION__);
+	printf("Begin call %s.........\n",__FUNCTION__);
 
 	char buf[4096] = {0};
 	char method[50], path[4096], protocol[32];
 
 	bufferevent_read(bev, buf, sizeof(buf));	// 读取并存储在buf
-	printf("buf[%s]\n", buf);
+	printf("\n%s\n", buf);
 	sscanf(buf, "%[^ ] %[^ ] %[^ \r\n]", method, path, protocol);
-	printf("method[%s], path[%s], protocol[%s]\n", method, path, protocol);
+	printf("Method[%s]  Path[%s]  Protocol[%s]\n", method, path, protocol);
 
 	if (strcasecmp(method, "GET") == 0) {	// 如果method为GET进行响应
 		response_http(bev, method, path);
 	}
 
-	printf("******************** end call %s.........\n", __FUNCTION__);
+	printf("End call %s.........\n", __FUNCTION__);
 }
 
 void conn_eventcb(struct bufferevent *bev, short events, void *user_data)
 {
-	printf("******************** begin call %s.........\n", __FUNCTION__);
+	printf("Begin call %s.........\n", __FUNCTION__);
 
 	if (events & BEV_EVENT_EOF) {
 		printf("Connection closed.\n");
@@ -160,7 +160,7 @@ void conn_eventcb(struct bufferevent *bev, short events, void *user_data)
 
 	bufferevent_free(bev);
 
-	printf("******************** end call %s.........\n", __FUNCTION__);
+	printf("End call %s.........\n", __FUNCTION__);
 }
 
 
@@ -177,7 +177,7 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data)
 void listener_cb(struct evconnlistener *listener,
 				evutil_socket_t fd, struct sockaddr *sa, int socklen, void *user_data)
 {
-	printf("******************** begin call-------%s\n",__FUNCTION__);
+	printf("Begin call-------%s\n",__FUNCTION__);
 	printf("fd is %d\n", fd);
 
 	struct event_base *base = user_data;
@@ -196,6 +196,6 @@ void listener_cb(struct evconnlistener *listener,
 	bufferevent_setcb(bev, conn_readcd, NULL, conn_eventcb, NULL);
 	bufferevent_enable(bev, EV_READ | EV_WRITE);
 
-	printf("******************** end call-------%s\n",__FUNCTION__);
+	printf("End call-------%s\n",__FUNCTION__);
 }
 

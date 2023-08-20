@@ -2,12 +2,25 @@
 
 ## 介绍
 
-基于 `libevent` 库，使用C语言开发的一个轻量级WebServer
+基于 `libevent` 库，使用C语言开发的一个轻量级 `WebServer` 
 
 ## 使用
 
+首先安装 `libevent` 库
+
+```shell
+# 安装
+sudo apt install libevent-dev
+# 查看安装是否成功
+pkg-config --modversion libevent 
+# 如果安装成功，显示： 2.1.12-stable
+```
+
+接着 `clone` 项目
+
 ```shell
 git clone https://github.com/PGwind/WebServer.git
+cd WebServer
 cd build
 make
 cd ..

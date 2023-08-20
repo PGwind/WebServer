@@ -1,4 +1,4 @@
-![example](https://img.shields.io/badge/tiny_web_server-v1.0-green.svg)   ![example](https://img.shields.io/badge/user:-pgwind-blue.svg)
+![example](https://img.shields.io/badge/tiny_web_server-v1.0-green.svg)   ![example](https://img.shields.io/badge/libevent-v2.1.12-blue.svg)
 
 ## 介绍
 

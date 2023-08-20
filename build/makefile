@@ -7,9 +7,10 @@ INC_DIR = ../inc
 ALL: $(target)
 
 $(target): $(src)
-        $(CC) $^ -o ../$@ $(myArgs) -levent -I$(INC_DIR)
+	$(CC) $^ -o ../$@ $(myArgs) -levent -I$(INC_DIR)
 
 clean:
-        -rm -rf $(target)
+	-rm -rf $(target)
 
 .PHONY: clean ALL
+

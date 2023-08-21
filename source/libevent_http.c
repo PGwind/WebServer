@@ -72,7 +72,7 @@ int send_header(struct bufferevent *bev, int no, const char *desp, const char *t
 int send_error(struct bufferevent *bev)
 {
 	send_header(bev, 404, "File Not Found", "text/html", -1);
-	send_file_to_http("404.html", bev);
+	send_file_to_http("/WebServer/404page/404.html", bev); 	// 此处填写绝对路径，如 /opt/WebServer/404page/404.html
 
 	return 0;
 }

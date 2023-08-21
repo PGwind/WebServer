@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Page Not Found</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 100px;
+        }
+        h1 {
+            font-size: 3em;
+            color: #f44336;
+        }
+        p {
+            font-size: 1.2em;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <h1>404</h1>
+    <p>前面的区域以后再来探索吧</p>
+    <button onclick="redirectToHomepage()">Go to Homepage</button>
+
+    <script>
+        function redirectToHomepage() {
+            window.location.href = "https://www.example.com"; // Replace with your desired URL
+        }
+    </script>
+</body>
+</html>

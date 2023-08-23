@@ -10,33 +10,50 @@
             text-align: center;
             padding: 100px;
         }
+
         h1 {
             font-size: 3em;
-            color: #f44336;
+            color: #000000;
         }
+
+        h2 {
+            font-size: 2em;
+            color: #600febe6;
+        }
+
         p {
             font-size: 1.2em;
         }
-        button {
-            padding: 10px 20px;
-            background-color: #f44336;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #d32f2f;
+        
+        button {  
+        padding: 15px 30px;  
+        background-color: #0cd9b3;  
+        color: white;  
+        border: none;  
+        cursor: pointer;  
+        font-size: 18px;  
+        font-weight: bold;  
+        text-align: center;  
+        text-decoration: none;  
+        transition: background-color 0.3s ease;  
+        }  
+  
+        button:hover {  
+        background-color: #b4e326;  
+        color: #fff;  
+        text-decoration: underline;  
         }
     </style>
 </head>
 <body>
-    <h1>404</h1>
+    <h1>404 not found</h1>
+    <h2>Sorry, the page you are looking for is not available.</h2>
     <p>前面的区域以后再来探索吧</p>
-    <button onclick="redirectToHomepage()">Go to Homepage</button>
+    <button onclick="redirectToHomepage()">回到主页</button>
 
     <script>
         function redirectToHomepage() {
-            window.location.href = "https://www.example.com"; // Replace with your desired URL
+            window.location.href = "https://www.liveout.cn"; 
         }
     </script>
 </body>

@@ -25,6 +25,9 @@ cd build
 make
 cd ..
 ./server port path
+
+# 举个栗子： 
+./server 9999 /opt
 ```
 
 其中，`port` 为指定的端口号，`path` 为访问根目录，访问链接为：`ip:port`

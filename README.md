@@ -32,6 +32,20 @@ cd ..
 
 其中，`port` 为指定的端口号，`path` 为访问根目录，访问链接为：`ip:port`
 
+## 注意
+
+在 `source/libevent_http.c` 文件中，大概 `72` 行的 `send_error()` 函数，需要将404页面路径改为绝对路径
+
+```c
+int send_error(struct bufferevent *bev)
+{
+	send_header(bev, 404, "File Not Found", "text/html", -1);
+	send_file_to_http("/WebServer/404page/404.html", bev); 	// 此处填写绝对路径，如 /opt/WebServer/404page/404.html
+
+	return 0;
+}
+```
+
 ## 演示
 
 ![](./images/http_server_libevent_1.png)

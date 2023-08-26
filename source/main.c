@@ -10,14 +10,15 @@ int main(int argc, char **argv)
 {
     if(argc < 3)
     {
-        printf("Please Input: ./server port path\n");
+        printf("Please Input: ./server port file_path\n");
+        printf("For Example：./server 9999 /opt");
         exit(1);
     }
 
     // 切换当前工作目录到由命令行参数 argv[2] 指定的目录
     if(chdir(argv[2]) < 0) {
-        printf("dir does not exist: %s\n", argv[2]);
-        perr_exit("chdir err:");
+        printf("Directory does not exist: %s\n", argv[2]);
+        perr_exit("Chdir err:");
     }
 
     struct event_base *base;

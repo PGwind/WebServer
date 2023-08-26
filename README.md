@@ -46,6 +46,11 @@ int send_error(struct bufferevent *bev)
 }
 ```
 
+## 问题
+
+- 递归文件夹大小显示问题
+- 404页面css，js调用问题
+
 ## 演示
 
 ![](./images/http_server_libevent_1.png)

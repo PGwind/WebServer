@@ -87,8 +87,8 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 	int i;
 
 	char buf[4096] = {0};
-	sprintf(buf, "<html><head><meta charset=\"utf-8\"><title>%s</title></head>", dirname);
-	sprintf(buf+strlen(buf), "<body><h1>当前目录：%s</h1><table>", dirname);
+	sprintf(buf, "<html><head><meta charset=\"utf-8\"><title>Index of ：%s</title></head>", dirname);
+	sprintf(buf+strlen(buf), "<body><h1>Index of ：%s</h1><table>", dirname);
 
 	// 添加目录内容
 	// scandir: 读取一个目录中的所有文件和子目录的信息，并按字母顺序进行排序
@@ -109,13 +109,16 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 			strftime(timestr, sizeof(timestr),
 				"  %d  %b   %Y  %H:%M", localtime(&fs.st_mtime));
 			if (S_ISDIR(fs.st_mode)) {
-				sprintf(buf+strlen(buf), 
-                        "<tr><td><a href=\"%s/\">%s/</a></td><td>%s</td><td>%ld</td></tr>\n",
-                        encode_name, dirinfo[i]->d_name, timestr, fs.st_size);
+			    sprintf(buf+strlen(buf), 
+			            "<tr><td><a href=\"%s/\">%s/</a></td><td>%s</td><td>%ld</td></tr>\n",
+			            encode_name, dirinfo[i]->d_name, timestr, fs.st_size);
 			} else {
-				sprintf(buf+strlen(buf), 
-                        "<tr><td><a href=\"%s\">%s</a></td><td>%s</td><td>%ld</td></tr>\n", 
-                        encode_name, dirinfo[i]->d_name, timestr, fs.st_size);
+			    char size_str[20];
+			    double size_mb = (double)fs.st_size / (1024 * 1024); // Convert size to MB
+			    sprintf(size_str, "%.2f MB", size_mb); // Format size as MB with two decimal places
+			    sprintf(buf+strlen(buf), 
+			            "<tr><td><a href=\"%s\">%s</a></td><td>%s</td><td>%s</td></tr>\n", 
+			            encode_name, dirinfo[i]->d_name, timestr, size_str);
 			}
 		}
 		bufferevent_write(bev, buf, strlen(buf));
@@ -124,7 +127,7 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 	sprintf(buf+strlen(buf), "</table></body></html>");
 	bufferevent_write(bev, buf, strlen(buf));
 
-	printf("Dir Read OK !!!!!!!!!!!!!!\n");
+	printf("Dir Read OK \n");
 
 	return 0;
 }

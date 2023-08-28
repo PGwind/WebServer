@@ -114,8 +114,8 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 			            encode_name, dirinfo[i]->d_name, timestr, fs.st_size);
 			} else {
 			    char size_str[20];
-			    double size_mb = (double)fs.st_size / (1024 * 1024); // Convert size to MB
-			    sprintf(size_str, "%.2f MB", size_mb); // Format size as MB with two decimal places
+			    double size_mb = (double)fs.st_size / (1024 * 1024); // 转换成 MB
+			    sprintf(size_str, "%.2f MB", size_mb); 
 			    sprintf(buf+strlen(buf), 
 			            "<tr><td><a href=\"%s\">%s</a></td><td>%s</td><td>%s</td></tr>\n", 
 			            encode_name, dirinfo[i]->d_name, timestr, size_str);
@@ -186,10 +186,10 @@ void listener_cb(struct evconnlistener *listener,
 	struct event_base *base = user_data;
 	struct bufferevent *bev;
 
-	bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE );
+	bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
 	if (!bev)
 	{
-		fprintf(stderr, "Error constructing bufferevnent!");
+		fprintf(stderr, "Error constructing bufferevent!");
 		event_base_loopbreak(base);
 		return ;
 	}

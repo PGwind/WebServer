@@ -1,21 +1,21 @@
 #include "total.h"
 
 /*
-     *charset=iso-8859-1	西欧的编码，说明网站采用的编码是英文；
-     *charset=gb2312		说明网站采用的编码是简体中文；
-     *charset=utf-8			代表世界通用的语言编码；
-     *						可以用到中文、韩文、日文等世界上所有语言编码上
-     *charset=euc-kr		说明网站采用的编码是韩文；
-     *charset=big5			说明网站采用的编码是繁体中文；
+     *charset=iso-8859-1    西欧的编码，说明网站采用的编码是英文；
+     *charset=gb2312        说明网站采用的编码是简体中文；
+     *charset=utf-8         代表世界通用的语言编码；
+     *                      可以用到中文、韩文、日文等世界上所有语言编码上
+     *charset=euc-kr        说明网站采用的编码是韩文；
+     *charset=big5          说明网站采用的编码是繁体中文；
      *
      *以下是依据传递进来的文件名，使用后缀判断是何种文件类型
      *将对应的文件类型按照http定义的关键字发送回去
 */
 const char *get_file_type(char *name)
 {
-	char* dot;
+    char* dot;
 
-    dot = strrchr(name, '.');	//自右向左查找‘.’字符;如不存在返回NULL
+    dot = strrchr(name, '.');   //自右向左查找‘.’字符;如不存在返回NULL
 
     if (dot == (char*)0)
         return "text/plain; charset=utf-8";
@@ -68,7 +68,7 @@ void strdecode(char *to, char *from)
         if (from[0] == '%' && isxdigit(from[1]) && isxdigit(from[2]))
         {
             // 依次判断from中 %20 三个字符
-            *to = hexit(from[1])*16 + hexit(from[2]);
+            *to = hexit(from[1]) * 16 + hexit(from[2]);
             // 移过已经处理的两个字符(%21指针指向1),表达式3的++from还会再向后移一个字符
             from += 2;
         }

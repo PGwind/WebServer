@@ -112,14 +112,27 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 			if (S_ISDIR(fs.st_mode)) {
 				calculate_folder_size(dirname, &total_size);
 				char size_str[20];
+
 				double size_mb = (double)total_size / (1024 * 1024);
-				sprintf(size_str, "%.2f MB", size_mb); 
+    			double size_kb = (double)total_size / 1024;
+    			if (size_mb >= 1)
+					sprintf(size_str, "%.2f MB", size_mb); 
+				else 
+					sprintf(size_str, "%.2f KB", size_kb);
+
 			    sprintf(buf+strlen(buf), 
 			            "<tr><td><a href=\"%s/\">%s/</a></td><td>%s</td><td>%s</td></tr>\n",
 			            encode_name, dirinfo[i]->d_name, timestr, size_str);
 			} else {
 			    char size_str[20];
-			    double size_mb = (double)fs.st_size / (1024 * 1024); 
+
+			    double size_mb = (double)total_size / (1024 * 1024);
+    			double size_kb = (double)total_size / 1024;
+    			if (size_mb >= 1)
+					sprintf(size_str, "%.2f MB", size_mb); 
+				else 
+					sprintf(size_str, "%.2f KB", size_kb); 
+
 			    sprintf(size_str, "%.2f MB", size_mb); 
 			    sprintf(buf+strlen(buf), 
 			            "<tr><td><a href=\"%s\">%s</a></td><td>%s</td><td>%s</td></tr>\n", 

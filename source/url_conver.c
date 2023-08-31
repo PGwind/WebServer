@@ -116,3 +116,33 @@ void strencode(char* to, size_t tosize, const char* from)
     }
     *to = '\0';
 }
+
+void calculate_folder_size(const char *folder_path, unsigned long long *total_size)
+{
+    struct stat file_stat;
+    DIR *dir;
+    struct dirent *entry;
+
+    if ((dir = opendir(folder_path)) == NULL) {
+        perror("opendir");
+        return;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        char file_path[1024];
+        snprintf(file_path, sizeof(file_path), "%s/%s", folder_path, entry->d_name);
+
+        if (stat(file_path, &file_stat) == 0) {
+            if (S_ISREG(file_stat.st_mode)) {
+                *total_size += file_stat.st_size;
+            } else if (S_ISDIR(file_stat.st_mode)) {
+                calculate_folder_size(file_path, total_size);
+            }
+        }
+    }
+
+    closedir(dir);
+}

@@ -85,6 +85,7 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 	struct stat fs;				// fileStatus 存储文件或目录的状态信息
 	struct dirent **dirinfo; 	// 存储目录中的单个目录项的信息
 	int i;
+	unsigned long long total_size = 0;
 
 	char buf[4096] = {0};
 	sprintf(buf, "<html><head><meta charset=\"utf-8\"><title>Index of ：%s</title></head>", dirname);
@@ -109,18 +110,23 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 			strftime(timestr, sizeof(timestr),
 				"  %d  %b   %Y  %H:%M", localtime(&fs.st_mtime));
 			if (S_ISDIR(fs.st_mode)) {
+				calculate_folder_size(dirname, &total_size);
+				char size_str[20];
+				double size_mb = (double)total_size / (1024 * 1024);
+				sprintf(size_str, "%.2f MB", size_mb); 
 			    sprintf(buf+strlen(buf), 
-			            "<tr><td><a href=\"%s/\">%s/</a></td><td>%s</td><td>%ld</td></tr>\n",
-			            encode_name, dirinfo[i]->d_name, timestr, fs.st_size);
+			            "<tr><td><a href=\"%s/\">%s/</a></td><td>%s</td><td>%s</td></tr>\n",
+			            encode_name, dirinfo[i]->d_name, timestr, size_str);
 			} else {
 			    char size_str[20];
-			    double size_mb = (double)fs.st_size / (1024 * 1024); // 转换成 MB
+			    double size_mb = (double)fs.st_size / (1024 * 1024); 
 			    sprintf(size_str, "%.2f MB", size_mb); 
 			    sprintf(buf+strlen(buf), 
 			            "<tr><td><a href=\"%s\">%s</a></td><td>%s</td><td>%s</td></tr>\n", 
 			            encode_name, dirinfo[i]->d_name, timestr, size_str);
 			}
 		}
+		
 		bufferevent_write(bev, buf, strlen(buf));
 		memset(buf, 0, sizeof(buf));
 	}
@@ -186,10 +192,10 @@ void listener_cb(struct evconnlistener *listener,
 	struct event_base *base = user_data;
 	struct bufferevent *bev;
 
-	bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
+	bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE );
 	if (!bev)
 	{
-		fprintf(stderr, "Error constructing bufferevent!");
+		fprintf(stderr, "Error constructing bufferevnent!");
 		event_base_loopbreak(base);
 		return ;
 	}

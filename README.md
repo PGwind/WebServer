@@ -20,6 +20,18 @@ pkg-config --modversion libevent
 
 ```shell
 git clone https://github.com/PGwind/WebServer.git
+```
+
+然后执行脚本 `start.sh`
+
+```shell
+chmod +x start.sh
+./start.sh
+```
+
+也可以自己编译执行
+
+```c
 cd WebServer
 cd build
 make

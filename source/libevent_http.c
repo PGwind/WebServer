@@ -133,7 +133,6 @@ int send_dir(struct bufferevent *bev,const char *dirname)
 				else 
 					sprintf(size_str, "%.2f KB", size_kb); 
 
-			    sprintf(size_str, "%.2f MB", size_mb); 
 			    sprintf(buf+strlen(buf), 
 			            "<tr><td><a href=\"%s\">%s</a></td><td>%s</td><td>%s</td></tr>\n", 
 			            encode_name, dirinfo[i]->d_name, timestr, size_str);

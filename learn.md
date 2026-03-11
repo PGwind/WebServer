@@ -1,6 +1,6 @@
 # WebServer Code Architecture
 
-## 1. 项目一句话介绍
+## 1. 项目介绍
 
 这是一个基于 `libevent` 的轻量级单进程 HTTP 静态文件服务器，核心能力是：
 

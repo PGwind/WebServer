@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Echo</title>
+    <style>
+        :root {
+            --bg: #f2ede3;
+            --surface: rgba(255, 252, 246, 0.88);
+            --text: #1d1a16;
+            --muted: #6a6258;
+            --accent: #b74d2c;
+            --accent-dark: #8f391f;
+            --line: rgba(29, 26, 22, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Avenir Next", "PingFang SC", "Helvetica Neue", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(183, 77, 44, 0.16), transparent 34%),
+                linear-gradient(135deg, #efe3d2 0%, #f6f1e8 48%, #e7d9c3 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .card {
+            width: min(920px, 100%);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            overflow: hidden;
+            backdrop-filter: blur(14px);
+            box-shadow: 0 28px 80px rgba(64, 42, 24, 0.16);
+        }
+
+        .hero {
+            padding: 40px 32px 24px;
+            background:
+                linear-gradient(120deg, rgba(183, 77, 44, 0.92), rgba(227, 163, 94, 0.84)),
+                linear-gradient(180deg, #000, #222);
+            color: #fff7ef;
+        }
+
+        .eyebrow {
+            margin: 0 0 10px;
+            font-size: 13px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            opacity: 0.78;
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-size: clamp(42px, 9vw, 84px);
+            line-height: 0.92;
+            letter-spacing: -0.05em;
+        }
+
+        .hero p {
+            margin: 14px 0 0;
+            max-width: 560px;
+            font-size: 17px;
+            line-height: 1.7;
+            color: rgba(255, 247, 239, 0.88);
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 28px;
+            padding: 28px 32px 32px;
+        }
+
+        .profile {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .avatar {
+            width: 168px;
+            height: 168px;
+            border-radius: 24px;
+            object-fit: cover;
+            border: 4px solid rgba(255, 255, 255, 0.7);
+            box-shadow: 0 16px 40px rgba(68, 44, 26, 0.18);
+        }
+
+        .note {
+            margin: 0;
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.74);
+            border: 1px solid var(--line);
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .links {
+            display: grid;
+            gap: 14px;
+            align-content: start;
+        }
+
+        .link-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 20px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid var(--line);
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+
+        .link-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(183, 77, 44, 0.28);
+            box-shadow: 0 16px 36px rgba(64, 42, 24, 0.12);
+        }
+
+        .label {
+            margin: 0 0 6px;
+            font-size: 14px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .title {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .url {
+            margin: 8px 0 0;
+            color: var(--accent);
+            word-break: break-all;
+        }
+
+        .arrow {
+            flex: 0 0 auto;
+            width: 44px;
+            height: 44px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            background: var(--accent);
+            color: #fff;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 760px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .avatar {
+                width: 132px;
+                height: 132px;
+            }
+
+            .hero {
+                padding: 32px 24px 20px;
+            }
+
+            .content {
+                padding: 22px 24px 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <section class="hero">
+            <p class="eyebrow">Personal Landing Page</p>
+            <h1>Echo</h1>
+            <p>一个用于汇总个人主页、内容账号和代码仓库入口的静态首页，适合直接放在当前 WebServer 里做演示页。</p>
+        </section>
+
+        <section class="content">
+            <aside class="profile">
+                <img class="avatar" src="https://liveout.cn/usr/uploads/pic/icon1.jpg" alt="Echo avatar">
+                <p class="note">这里放常用入口。浏览器访问 `/page/` 就能看到这个页面，适合部署后当作简单导航首页。</p>
+            </aside>
+
+            <div class="links">
+                <a class="link-card" href="https://liveout.cn/" target="_blank" rel="noopener noreferrer">
+                    <div>
+                        <p class="label">Blog</p>
+                        <p class="title">Echo 的博客</p>
+                        <p class="url">https://liveout.cn/</p>
+                    </div>
+                    <span class="arrow">↗</span>
+                </a>
+
+                <a class="link-card" href="https://space.bilibili.com/137469404?spm_id_from=333.33.0.0" target="_blank" rel="noopener noreferrer">
+                    <div>
+                        <p class="label">Bilibili</p>
+                        <p class="title">Echo 的 B 站主页</p>
+                        <p class="url">https://space.bilibili.com/137469404?spm_id_from=333.33.0.0</p>
+                    </div>
+                    <span class="arrow">↗</span>
+                </a>
+
+                <a class="link-card" href="https://github.com" target="_blank" rel="noopener noreferrer">
+                    <div>
+                        <p class="label">GitHub</p>
+                        <p class="title">GitHub</p>
+                        <p class="url">https://github.com</p>
+                    </div>
+                    <span class="arrow">↗</span>
+                </a>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

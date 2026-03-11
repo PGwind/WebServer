@@ -3,6 +3,8 @@
 
 #define HTTP_CLOSE "Connection: close\r\n"
 
+static const char CUSTOM_404_PATH[] = "page/404.html";
+
 static const char NOT_FOUND_PAGE[] =
     "<html><head><meta charset=\"utf-8\"><title>404 Not Found</title></head>"
     "<body><h1>404 Not Found</h1><p>The requested resource was not found.</p>"
@@ -143,6 +145,18 @@ int send_header(struct bufferevent *bev, int no, const char *desp,
 
 int send_error(struct bufferevent *bev)
 {
+    struct stat fs;
+
+    if (access(CUSTOM_404_PATH, R_OK) == 0 &&
+        stat(CUSTOM_404_PATH, &fs) == 0 &&
+        S_ISREG(fs.st_mode)) {
+        send_header(bev, 404, "File Not Found", get_file_type(CUSTOM_404_PATH),
+                    fs.st_size);
+        if (send_file_to_http(CUSTOM_404_PATH, bev) == 0) {
+            return 0;
+        }
+    }
+
     return send_html_response(bev, 404, "File Not Found", NOT_FOUND_PAGE);
 }
 

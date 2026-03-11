@@ -17,8 +17,8 @@
 
 ```text
 WebServer/
-├── 404page/
-│   └── 404.html                # 旧版 404 页面资源
+├── page/
+│   └── index.html              # 个人首页静态页面
 ├── build/
 │   └── makefile                # 编译脚本
 ├── inc/

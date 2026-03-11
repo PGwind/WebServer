@@ -1,5 +1,9 @@
 ![example](https://img.shields.io/badge/tiny_web_server-v1.0-green.svg)   ![example](https://img.shields.io/badge/libevent-v2.1.12-blue.svg)
 
+## 前言
+
+基于黑马Llinux 网络教程的小项目二次开发学习
+
 ## 介绍
 
 基于 `libevent` 库，使用C语言开发的一个轻量级 `WebServer` 

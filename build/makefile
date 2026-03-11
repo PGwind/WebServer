@@ -1,16 +1,23 @@
-src = $(wildcard ../source/*.c)
-myArgs = -Wall -g
-target = server
-CC = gcc
-INC_DIR = ../inc
+CC ?= gcc
+TARGET := ../server
+SRC := $(wildcard ../source/*.c)
+INC_DIR := ../inc
+CFLAGS ?= -Wall -g
+EVENT_CFLAGS := $(shell pkg-config --cflags libevent 2>/dev/null)
+EVENT_LIBS := $(shell pkg-config --libs libevent 2>/dev/null)
 
-ALL: $(target)
+ifeq ($(strip $(EVENT_LIBS)),)
+EVENT_LIBS := -levent
+endif
 
-$(target): $(src)
-	$(CC) $^ -o ../$@ $(myArgs) -levent -I$(INC_DIR)
+.DEFAULT_GOAL := all
+
+all: $(TARGET)
+
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) -I$(INC_DIR) $(EVENT_CFLAGS) $^ -o $@ $(EVENT_LIBS)
 
 clean:
-	-rm -rf $(target)
+	$(RM) $(TARGET)
 
-.PHONY: clean ALL
-
+.PHONY: all clean

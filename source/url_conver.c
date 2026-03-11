@@ -11,7 +11,7 @@
      *以下是依据传递进来的文件名，使用后缀判断是何种文件类型
      *将对应的文件类型按照http定义的关键字发送回去
 */
-const char *get_file_type(char *name)
+const char *get_file_type(const char *name)
 {
     char* dot;
 

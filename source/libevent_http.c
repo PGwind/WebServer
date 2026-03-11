@@ -1,222 +1,325 @@
 #include "total.h"
 #include "url_conver.h"
 
-#define HTTP_CLOSE "Connection: close\r\n"\
+#define HTTP_CLOSE "Connection: close\r\n"
 
+static const char NOT_FOUND_PAGE[] =
+    "<html><head><meta charset=\"utf-8\"><title>404 Not Found</title></head>"
+    "<body><h1>404 Not Found</h1><p>The requested resource was not found.</p>"
+    "</body></html>";
+
+static const char FORBIDDEN_PAGE[] =
+    "<html><head><meta charset=\"utf-8\"><title>403 Forbidden</title></head>"
+    "<body><h1>403 Forbidden</h1><p>Path traversal is not allowed.</p>"
+    "</body></html>";
+
+static int path_is_safe(const char *path)
+{
+    const char *segment = path;
+
+    while (*segment != '\0') {
+        while (*segment == '/') {
+            ++segment;
+        }
+
+        if (segment[0] == '.' && segment[1] == '.' &&
+            (segment[2] == '/' || segment[2] == '\0')) {
+            return 0;
+        }
+
+        while (*segment != '\0' && *segment != '/') {
+            ++segment;
+        }
+    }
+
+    return 1;
+}
+
+static int send_html_response(struct bufferevent *bev, int no, const char *desp,
+                              const char *body)
+{
+    size_t body_len = strlen(body);
+
+    send_header(bev, no, desp, "text/html; charset=utf-8", (long)body_len);
+    bufferevent_write(bev, body, body_len);
+
+    return 0;
+}
 
 int response_http(struct bufferevent *bev, const char *method, char *path)
 {
-	if (strcasecmp("GET", method) == 0) {
-		strdecode(path, path);	// 解码
-		char *file_path = &path[1];
+    if (strcasecmp("GET", method) == 0) {
+        strdecode(path, path);
+        if (!path_is_safe(path)) {
+            fprintf(stderr, "Blocked unsafe path: %s\n", path);
+            send_html_response(bev, 403, "Forbidden", FORBIDDEN_PAGE);
+            return -1;
+        }
 
-		if (strcmp(path, "/") == 0 || strcmp(path, "/.") == 0)
-			file_path = "./";
-		printf("Http Request Resource Path =  %s, File_path = %s\n", path, file_path);
+        char *file_path = &path[1];
 
-		struct stat fs;	// fileStatus 存储文件或目录的状态信息
-		if (stat(file_path, &fs) < 0) {
-			perror("open file err: ");
-			send_error(bev);
-			return -1;
-		}
+        if (strcmp(path, "/") == 0 || strcmp(path, "/.") == 0) {
+            file_path = "./";
+        }
+        printf("Http Request Resource Path = %s, File_path = %s\n", path, file_path);
 
-		if (S_ISDIR(fs.st_mode)) {	// 处理目录
-			// 显示目录列表
-			send_header(bev, 200, "OK", get_file_type(".html"), -1);
-			send_dir(bev, file_path);
-	 	} else {					// 处理文件
-	 		send_header(bev, 200, "Ok", get_file_type(file_path), fs.st_size);
-	 		send_file_to_http(file_path, bev);
-	 	}
-	}
-	return 0;
+        if (access(file_path, R_OK) < 0) {
+            perror("access file err");
+            if (errno == EACCES) {
+                send_html_response(bev, 403, "Forbidden", FORBIDDEN_PAGE);
+            } else {
+                send_error(bev);
+            }
+            return -1;
+        }
+
+        struct stat fs;
+        if (stat(file_path, &fs) < 0) {
+            perror("stat file err");
+            send_error(bev);
+            return -1;
+        }
+
+        if (S_ISDIR(fs.st_mode)) {
+            return send_dir(bev, file_path);
+        }
+
+        send_header(bev, 200, "OK", get_file_type(file_path), fs.st_size);
+        if (send_file_to_http(file_path, bev) < 0) {
+            fprintf(stderr, "Failed to send file: %s\n", file_path);
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 int send_file_to_http(const char *filename, struct bufferevent *bev)
 {
-	int fd = open(filename, O_RDONLY);
-	int ret = 0;
-	char buf[4096] = {0};
+    int fd = open(filename, O_RDONLY);
+    int ret = 0;
+    char buf[4096];
 
-	while ((ret = read(fd ,buf, sizeof(buf))) )	// ()明确判断 read 函数的返回值是否大于 0
-	{
-		bufferevent_write(bev, buf, ret);
-		memset(buf, 0, ret);
-	}
-	close(fd);
-	return 0;
+    if (fd < 0) {
+        perror("open file err");
+        return -1;
+    }
+
+    while ((ret = read(fd, buf, sizeof(buf))) > 0) {
+        bufferevent_write(bev, buf, (size_t)ret);
+    }
+
+    if (ret < 0) {
+        perror("read file err");
+        close(fd);
+        return -1;
+    }
+
+    close(fd);
+    return 0;
 }
 
-int send_header(struct bufferevent *bev, int no, const char *desp, const char *type, long len)
+int send_header(struct bufferevent *bev, int no, const char *desp,
+                const char *type, long len)
 {
-	char buf[256] = {0};
+    char buf[256];
 
-	//HTTP/1.1 200 OK\r\n
-	sprintf(buf, "HTTP/1.1 %d %s \r\n", no, desp);
-	bufferevent_write(bev, buf, strlen(buf));
-	// 文件类型
-	sprintf(buf, "Content-Type:%s\r\n", type);
-	bufferevent_write(bev, buf, strlen(buf));
-	// 文件大小
-	sprintf(buf, "Content-Length:%ld\r\n", len);
-	bufferevent_write(bev, buf, strlen(buf));
-	// Connection: close
-	bufferevent_write(bev, HTTP_CLOSE, strlen(HTTP_CLOSE));
-	// send \r\n
-	bufferevent_write(bev, "\r\n", 2);
+    snprintf(buf, sizeof(buf), "HTTP/1.1 %d %s\r\n", no, desp);
+    bufferevent_write(bev, buf, strlen(buf));
 
-	return 0;
+    snprintf(buf, sizeof(buf), "Content-Type: %s\r\n", type);
+    bufferevent_write(bev, buf, strlen(buf));
+
+    if (len >= 0) {
+        snprintf(buf, sizeof(buf), "Content-Length: %ld\r\n", len);
+        bufferevent_write(bev, buf, strlen(buf));
+    }
+
+    bufferevent_write(bev, HTTP_CLOSE, strlen(HTTP_CLOSE));
+    bufferevent_write(bev, "\r\n", 2);
+
+    return 0;
 }
 
 int send_error(struct bufferevent *bev)
 {
-	send_header(bev, 404, "File Not Found", "text/html", -1);
-	send_file_to_http("/WebServer/404page/404.html", bev); 	// 此处填写绝对路径，如 /opt/WebServer/404page/404.html
-
-	return 0;
+    return send_html_response(bev, 404, "File Not Found", NOT_FOUND_PAGE);
 }
 
-int send_dir(struct bufferevent *bev,const char *dirname)
+int send_dir(struct bufferevent *bev, const char *dirname)
 {
-	char encode_name[1024];
-	char path[1024];
-	char timestr[64];
-	struct stat fs;				// fileStatus 存储文件或目录的状态信息
-	struct dirent **dirinfo; 	// 存储目录中的单个目录项的信息
-	int i;
-	unsigned long long total_size = 0;
+    char encode_name[1024];
+    char path[PATH_MAX];
+    char timestr[64];
+    struct stat fs;
+    struct dirent **dirinfo = NULL;
+    int i;
+    int num;
+    char buf[4096];
 
-	char buf[4096] = {0};
-	sprintf(buf, "<html><head><meta charset=\"utf-8\"><title>Index of ：%s</title></head>", dirname);
-	sprintf(buf+strlen(buf), "<body><h1>Index of ：%s</h1><table>", dirname);
+    send_header(bev, 200, "OK", "text/html; charset=utf-8", -1);
 
-	// 添加目录内容
-	// scandir: 读取一个目录中的所有文件和子目录的信息，并按字母顺序进行排序
-	int num = scandir(dirname, &dirinfo, NULL, alphasort);	// 返回数组的大小, 即目录项的数量
-	for (i = 0; i < num; i++)
-	{
-		// 编码
-		strencode(encode_name, sizeof(encode_name), dirinfo[i]->d_name);
-	
-		sprintf(path, "%s%s", dirname, dirinfo[i]->d_name);	// 目录的路径+目录中的文件名
-		printf("Path = %s\n", path);
+    snprintf(buf, sizeof(buf),
+             "<html><head><meta charset=\"utf-8\"><title>Index of %s</title></head>"
+             "<body><h1>Index of %s</h1><table>",
+             dirname, dirname);
+    bufferevent_write(bev, buf, strlen(buf));
 
-		if (lstat(path, &fs) < 0) {	// 获取文件或符号链接的元数据
-			sprintf(buf + strlen(buf),
-				"<tr><td><a href=\"%s\">%s</a></td></tr>\n",
-				encode_name, dirinfo[i]->d_name);
-		} else {
-			strftime(timestr, sizeof(timestr),
-				"  %d  %b   %Y  %H:%M", localtime(&fs.st_mtime));
-			if (S_ISDIR(fs.st_mode)) {
-				calculate_folder_size(dirname, &total_size);
-				char size_str[20];
+    num = scandir(dirname, &dirinfo, NULL, alphasort);
+    if (num < 0) {
+        const char *dir_error = "</table><p>Failed to read directory.</p></body></html>";
+        perror("scandir err");
+        bufferevent_write(bev, dir_error, strlen(dir_error));
+        return -1;
+    }
 
-				double size_mb = (double)total_size / (1024 * 1024);
-    			double size_kb = (double)total_size / 1024;
-    			if (size_mb >= 1)
-					sprintf(size_str, "%.2f MB", size_mb); 
-				else 
-					sprintf(size_str, "%.2f KB", size_kb);
+    for (i = 0; i < num; i++) {
+        unsigned long long entry_size = 0;
+        char size_str[32];
 
-			    sprintf(buf+strlen(buf), 
-			            "<tr><td><a href=\"%s/\">%s/</a></td><td>%s</td><td>%s</td></tr>\n",
-			            encode_name, dirinfo[i]->d_name, timestr, size_str);
-			} else {
-			    char size_str[20];
+        if (strcmp(dirinfo[i]->d_name, ".") == 0 ||
+            strcmp(dirinfo[i]->d_name, "..") == 0) {
+            free(dirinfo[i]);
+            continue;
+        }
 
-			    double size_mb = (double)total_size / (1024 * 1024);
-    			double size_kb = (double)total_size / 1024;
-    			if (size_mb >= 1)
-					sprintf(size_str, "%.2f MB", size_mb); 
-				else 
-					sprintf(size_str, "%.2f KB", size_kb); 
+        strencode(encode_name, sizeof(encode_name), dirinfo[i]->d_name);
+        snprintf(path, sizeof(path), "%s/%s", dirname, dirinfo[i]->d_name);
 
-			    sprintf(buf+strlen(buf), 
-			            "<tr><td><a href=\"%s\">%s</a></td><td>%s</td><td>%s</td></tr>\n", 
-			            encode_name, dirinfo[i]->d_name, timestr, size_str);
-			}
-		}
-		
-		bufferevent_write(bev, buf, strlen(buf));
-		memset(buf, 0, sizeof(buf));
-	}
-	sprintf(buf+strlen(buf), "</table></body></html>");
-	bufferevent_write(bev, buf, strlen(buf));
+        if (lstat(path, &fs) < 0) {
+            snprintf(buf, sizeof(buf),
+                     "<tr><td><a href=\"%s\">%s</a></td>"
+                     "<td>-</td><td>Unknown</td></tr>\n",
+                     encode_name, dirinfo[i]->d_name);
+        } else {
+            strftime(timestr, sizeof(timestr), "%d %b %Y %H:%M",
+                     localtime(&fs.st_mtime));
 
-	printf("Dir Read OK \n");
+            if (S_ISDIR(fs.st_mode)) {
+                calculate_folder_size(path, &entry_size);
+            } else {
+                entry_size = (unsigned long long)fs.st_size;
+            }
 
-	return 0;
+            if (entry_size >= 1024ULL * 1024ULL) {
+                snprintf(size_str, sizeof(size_str), "%.2f MB",
+                         (double)entry_size / (1024.0 * 1024.0));
+            } else {
+                snprintf(size_str, sizeof(size_str), "%.2f KB",
+                         (double)entry_size / 1024.0);
+            }
+
+            if (S_ISDIR(fs.st_mode)) {
+                snprintf(buf, sizeof(buf),
+                         "<tr><td><a href=\"%s/\">%s/</a></td>"
+                         "<td>%s</td><td>%s</td></tr>\n",
+                         encode_name, dirinfo[i]->d_name, timestr, size_str);
+            } else {
+                snprintf(buf, sizeof(buf),
+                         "<tr><td><a href=\"%s\">%s</a></td>"
+                         "<td>%s</td><td>%s</td></tr>\n",
+                         encode_name, dirinfo[i]->d_name, timestr, size_str);
+            }
+        }
+
+        bufferevent_write(bev, buf, strlen(buf));
+        free(dirinfo[i]);
+    }
+
+    free(dirinfo);
+    bufferevent_write(bev, "</table></body></html>",
+                      strlen("</table></body></html>"));
+
+    printf("Dir Read OK\n");
+
+    return 0;
 }
 
 void conn_readcd(struct bufferevent *bev, void *user_data)
 {
-	printf("Begin call %s.........\n",__FUNCTION__);
+    (void)user_data;
+    printf("Begin call %s.........\n", __FUNCTION__);
 
-	char buf[4096] = {0};
-	char method[50], path[4096], protocol[32];
+    char buf[4096] = {0};
+    char method[50] = {0};
+    char path[4096] = {0};
+    char protocol[32] = {0};
+    size_t read_len;
 
-	bufferevent_read(bev, buf, sizeof(buf));	// 读取并存储在buf
-	printf("\n%s\n", buf);
-	sscanf(buf, "%[^ ] %[^ ] %[^ \r\n]", method, path, protocol);
-	printf("Method[%s]  Path[%s]  Protocol[%s]\n", method, path, protocol);
+    read_len = bufferevent_read(bev, buf, sizeof(buf) - 1);
+    if (read_len == 0) {
+        return;
+    }
 
-	if (strcasecmp(method, "GET") == 0) {	// 如果method为GET进行响应
-		response_http(bev, method, path);
-	}
+    printf("\n%s\n", buf);
+    if (sscanf(buf, "%49s %4095s %31s", method, path, protocol) != 3) {
+        fprintf(stderr, "Invalid HTTP request line\n");
+        send_html_response(bev, 400, "Bad Request",
+                           "<html><body><h1>400 Bad Request</h1></body></html>");
+        return;
+    }
+    printf("Method[%s] Path[%s] Protocol[%s]\n", method, path, protocol);
 
-	printf("End call %s.........\n", __FUNCTION__);
+    if (strcasecmp(method, "GET") == 0) {
+        response_http(bev, method, path);
+    } else {
+        send_html_response(bev, 405, "Method Not Allowed",
+                           "<html><body><h1>405 Method Not Allowed</h1></body></html>");
+    }
+
+    printf("End call %s.........\n", __FUNCTION__);
 }
 
 void conn_eventcb(struct bufferevent *bev, short events, void *user_data)
 {
-	printf("Begin call %s.........\n", __FUNCTION__);
+    (void)user_data;
+    printf("Begin call %s.........\n", __FUNCTION__);
 
-	if (events & BEV_EVENT_EOF) {
-		printf("Connection closed.\n");
-	} else if (events & BEV_EVENT_ERROR) {
-		fprintf(stderr, "Got an error on the connection: %s\n", strerror(errno));
-	}
+    if (events & BEV_EVENT_EOF) {
+        printf("Connection closed.\n");
+    } else if (events & BEV_EVENT_ERROR) {
+        fprintf(stderr, "Got an error on the connection: %s\n", strerror(errno));
+    }
 
-	bufferevent_free(bev);
+    bufferevent_free(bev);
 
-	printf("End call %s.........\n", __FUNCTION__);
+    printf("End call %s.........\n", __FUNCTION__);
 }
 
-
-// 捕获中断信号并进行优雅的退出处理
 void signal_cb(evutil_socket_t sig, short events, void *user_data)
 {
-	struct event_base *base = user_data;
-	struct timeval delay = {1, 0};
+    (void)sig;
+    (void)events;
+    struct event_base *base = user_data;
+    struct timeval delay = {1, 0};
 
-	printf("Caught an interrupt signal; exiting cleanly in one seconds.\n");
-	event_base_loopexit(base, &delay);	// 设置 event base（事件循环）在指定的时间后退出
+    printf("Caught an interrupt signal; exiting cleanly in one second.\n");
+    event_base_loopexit(base, &delay);
 }
 
 void listener_cb(struct evconnlistener *listener,
-				evutil_socket_t fd, struct sockaddr *sa, int socklen, void *user_data)
+                 evutil_socket_t fd, struct sockaddr *sa, int socklen,
+                 void *user_data)
 {
-	printf("Begin call-------%s\n",__FUNCTION__);
-	printf("fd is %d\n", fd);
+    (void)listener;
+    (void)sa;
+    (void)socklen;
+    printf("Begin call-------%s\n", __FUNCTION__);
+    printf("fd is %d\n", fd);
 
-	struct event_base *base = user_data;
-	struct bufferevent *bev;
+    struct event_base *base = user_data;
+    struct bufferevent *bev;
 
-	bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE );
-	if (!bev)
-	{
-		fprintf(stderr, "Error constructing bufferevnent!");
-		event_base_loopbreak(base);
-		return ;
-	}
+    bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
+    if (!bev) {
+        fprintf(stderr, "Error constructing bufferevent\n");
+        event_base_loopbreak(base);
+        return;
+    }
 
-	// 配置回调函数和事件监听
-	bufferevent_flush(bev, EV_READ | EV_WRITE, BEV_NORMAL);
-	bufferevent_setcb(bev, conn_readcd, NULL, conn_eventcb, NULL);
-	bufferevent_enable(bev, EV_READ | EV_WRITE);
+    bufferevent_flush(bev, EV_READ | EV_WRITE, BEV_NORMAL);
+    bufferevent_setcb(bev, conn_readcd, NULL, conn_eventcb, NULL);
+    bufferevent_enable(bev, EV_READ | EV_WRITE);
 
-	printf("End call-------%s\n",__FUNCTION__);
+    printf("End call-------%s\n", __FUNCTION__);
 }
-

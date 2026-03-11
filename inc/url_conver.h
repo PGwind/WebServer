@@ -20,7 +20,7 @@
 #include <event2/bufferevent.h>
 #include <event2/event.h>
 
-const char *get_file_type(char *name);
+const char *get_file_type(const char *name);
 
 void strdecode(char *to, char *from);
 

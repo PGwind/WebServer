@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <dirent.h>
@@ -15,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <limits.h>
 #include <event2/listener.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -22,7 +24,7 @@
 
 void conn_eventcb(struct bufferevent *bev, short events, void *user_data);
 
-void conn_readcb(struct bufferevent *bev, void *user_data);
+void conn_readcd(struct bufferevent *bev, void *user_data);
 
 void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
                  struct sockaddr *sa, int socklen, void *user_data);

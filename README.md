@@ -10,7 +10,8 @@
 
 ```shell
 # 安装
-sudo apt install libevent-dev
+sudo apt update
+sudo apt install -y build-essential pkg-config libevent-dev
 # 查看安装是否成功
 pkg-config --modversion libevent 
 # 如果安装成功，显示： 2.1.12-stable
@@ -27,6 +28,9 @@ git clone https://github.com/PGwind/WebServer.git
 ```shell
 chmod +x start.sh
 ./start.sh
+
+# 也可以指定端口和静态资源目录
+./start.sh 9999 /opt
 ```
 
 也可以自己编译执行
@@ -44,24 +48,13 @@ cd ..
 
 其中，`port` 为指定的端口号，`path` 为访问根目录，访问链接为：`ip:port`
 
-## 注意
+项目现在内置了默认 404 页面，不再依赖额外的绝对路径配置。
 
-在 `source/libevent_http.c` 文件中，大概 `72` 行的 `send_error()` 函数，需要将404页面路径改为绝对路径
+## 已优化
 
-```c
-int send_error(struct bufferevent *bev)
-{
-	send_header(bev, 404, "File Not Found", "text/html", -1);
-	send_file_to_http("/WebServer/404page/404.html", bev); 	// 此处填写绝对路径，如 /opt/WebServer/404page/404.html
-
-	return 0;
-}
-```
-
-## 问题
-
-- 递归文件夹大小显示问题
-- 404页面css，js调用问题
+- 修复目录列表中的文件夹大小计算错误
+- 内置默认 404 页面，去掉绝对路径依赖
+- `start.sh` 支持自定义端口和静态资源目录
 
 ## 演示
 
@@ -70,4 +63,3 @@ int send_error(struct bufferevent *bev)
 
 
 ![](./images/http_server_libevent_2.png)
-

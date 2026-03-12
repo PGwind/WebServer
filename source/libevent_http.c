@@ -355,6 +355,8 @@ int send_file_to_http(const char *filename, struct bufferevent *bev,
     int fd = open(filename, O_RDONLY);
     int ret = 0;
     char buf[4096];
+    struct stat file_stat;
+    struct evbuffer *output;
 
     if (fd < 0) {
         log_errno_message(ctx, "open file failed");
@@ -364,6 +366,19 @@ int send_file_to_http(const char *filename, struct bufferevent *bev,
     if (!send_body) {
         close(fd);
         return 0;
+    }
+
+    if (fstat(fd, &file_stat) < 0) {
+        log_errno_message(ctx, "fstat file failed");
+        close(fd);
+        return -1;
+    }
+
+    if (S_ISREG(file_stat.st_mode)) {
+        output = bufferevent_get_output(bev);
+        if (evbuffer_add_file(output, fd, 0, file_stat.st_size) == 0) {
+            return 0;
+        }
     }
 
     while ((ret = read(fd, buf, sizeof(buf))) > 0) {

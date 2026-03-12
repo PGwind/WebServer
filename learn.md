@@ -154,8 +154,8 @@ flowchart TD
   - 在需要时补充 `Allow`、`Last-Modified`
 
 - `send_file_to_http`
-  - 循环 `read()` 文件内容
-  - 调用 `bufferevent_write()` 发给客户端
+  - 优先使用 `evbuffer_add_file()` 挂接文件到输出缓冲
+  - 失败时回退到 `read() + bufferevent_write()`
 
 - `send_dir`
   - 使用 `scandir()` 枚举目录
@@ -257,7 +257,12 @@ GET /README.md HTTP/1.1
 2. `response_http` 将路径映射为 `README.md`
 3. `stat()` 判断这是普通文件
 4. `send_header()` 写入状态行、`Date`、`Server`、`Content-Type`、`Content-Length`，并附带 `Last-Modified`
-5. `send_file_to_http()` 分块读取并发送文件
+5. `send_file_to_http()` 按高效文件输出路径发送内容
+
+补充说明：
+
+- 常规文件会优先走 `evbuffer_add_file()`，减少大文件传输时的用户态拷贝开销
+- 如果当前平台或场景不支持，再回退到普通分块读取
 
 ### 7.1.1 请求 HEAD
 
@@ -382,6 +387,11 @@ GET /not_found.html HTTP/1.1
 - 去掉目录页中的递归文件夹大小统计，避免大目录阻塞请求
 - 目录和文件的响应逻辑更清晰
 
+### 9.5 传输性能优化
+
+- 普通文件发送优先使用 `evbuffer_add_file()`，让 libevent 走更高效的文件输出路径
+- 当 `evbuffer_add_file()` 不可用或失败时，自动回退到原来的分块读取发送
+
 ## 10. 项目局限性
 
 这是面试里很重要的一部分。主动说局限性会显得你判断力更强。
@@ -442,7 +452,7 @@ GET /not_found.html HTTP/1.1
 
 - 支持更完整的 HTTP Header 解析
 - 增加 Keep-Alive
-- 使用 `sendfile` 优化大文件传输
+- 增加缓存协商，例如 `If-Modified-Since` / `ETag`
 - 增加配置文件
 - 增加单元测试和压测
 

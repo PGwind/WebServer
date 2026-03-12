@@ -23,7 +23,6 @@ WebServer/
 │   └── makefile                # 编译脚本
 ├── inc/
 │   ├── libevent_http.h         # HTTP 服务核心声明
-│   ├── total.h                 # 总头文件
 │   └── url_conver.h            # URL 编解码、文件类型、目录大小统计
 ├── source/
 │   ├── libevent_http.c         # 网络事件处理、HTTP 响应、目录渲染

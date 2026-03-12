@@ -5,7 +5,7 @@
 这是一个基于 `libevent` 的轻量级单进程 HTTP 静态文件服务器，核心能力是：
 
 - 监听 TCP 端口
-- 解析浏览器发送的 HTTP GET 请求
+- 解析浏览器发送的 HTTP `GET` / `HEAD` 请求
 - 根据 URL 映射本地文件或目录
 - 返回文件内容或动态生成目录索引页面
 
@@ -166,7 +166,8 @@ flowchart TD
 
 - `send_header`
   - 拼 HTTP 响应头
-  - 负责状态码、Date、Server、Content-Type、Content-Length
+  - 负责状态码、Date、Server、Content-Type
+  - 在内容长度已知时补充 `Content-Length`
   - 在需要时补充 `Allow`、`Last-Modified`
 
 - `send_file_to_http`
@@ -174,7 +175,8 @@ flowchart TD
   - 失败时回退到 `read() + bufferevent_write()`
 
 - `send_error`
-  - 返回内置 404 页面
+  - 优先返回 `page/404.html`
+  - 自定义 404 页面不可用时回退到内置 404 页面
 
 ## 5.4 `source/directory_listing.c`
 
@@ -237,7 +239,7 @@ flowchart TD
 - 返回状态行
 - 返回 `Date`、`Server`
 - 返回 `Content-Type`
-- 返回 `Content-Length`
+- 在内容长度已知时返回 `Content-Length`
 - 对文件返回 `Last-Modified`
 - 返回实体内容
 
@@ -282,7 +284,7 @@ GET /README.md HTTP/1.1
 1. `conn_readcd` 解析得到 `GET` 和 `/README.md`
 2. `response_http` 将路径映射为 `README.md`
 3. `stat()` 判断这是普通文件
-4. `send_header()` 写入状态行、`Date`、`Server`、`Content-Type`、`Content-Length`，并附带 `Last-Modified`
+4. `send_header()` 写入状态行、`Date`、`Server`、`Content-Type`，在长度已知时补充 `Content-Length`，并附带 `Last-Modified`
 5. `send_file_to_http()` 按高效文件输出路径发送内容
 
 补充说明：
@@ -484,7 +486,7 @@ GET /not_found.html HTTP/1.1
 
 ## 12. 一段适合面试直接背的项目介绍
 
-> 这是一个基于 C 语言和 libevent 实现的轻量级静态 WebServer。整体采用事件驱动模型，主流程是 main 初始化事件循环和监听器，新连接进入 listener 回调后通过 bufferevent 处理读事件，请求解析后根据 URL 映射本地文件或目录。它现在支持 `GET` 和 `HEAD`，对于普通文件返回更完整的 HTTP 响应头和文件内容，对于目录则动态生成带 HTML 转义的索引页，同时输出统一访问日志。我在这个项目里主要关注了 HTTP 最小实现、文件系统访问、URL 编解码、路径安全校验，以及 Linux 服务器上的构建和部署流程。
+> 这是一个基于 C 语言和 libevent 实现的轻量级静态 WebServer。整体采用事件驱动模型，主流程是 main 初始化事件循环和监听器，新连接进入 listener 回调后通过 bufferevent 处理读事件，请求解析后根据 URL 映射本地文件或目录。它现在支持 `GET` 和 `HEAD`，对于普通文件返回更完整的 HTTP 响应头和文件内容，对于目录则动态生成带 HTML 转义的索引页，同时输出统一访问日志。我在这个项目里主要关注了 HTTP 最小实现、文件系统访问、URL 编解码、路径安全校验，以及 Linux 服务器上的构建和部署流程。需要注意的是，`Content-Length` 目前主要覆盖普通文件和长度已知的 HTML 响应，目录页仍然是流式输出。
 
 ## 13. 学习建议
 

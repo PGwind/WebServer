@@ -21,6 +21,7 @@
 #include "url_conver.h"
 
 #define HTTP_CLOSE "Connection: close\r\n"
+#define MAX_REQUEST_HEADER_SIZE 16384
 
 struct client_context {
     char client_ip[INET6_ADDRSTRLEN];
@@ -166,6 +167,24 @@ static void fill_client_ip(const struct sockaddr *sa, char *buf, size_t buf_size
         inet_ntop(sa->sa_family, addr_ptr, buf, (socklen_t)buf_size) == NULL) {
         snprintf(buf, buf_size, "unknown");
     }
+}
+
+static ssize_t find_request_header_end(const char *data, size_t len)
+{
+    size_t i;
+
+    if (len < 4) {
+        return -1;
+    }
+
+    for (i = 0; i + 3 < len; ++i) {
+        if (data[i] == '\r' && data[i + 1] == '\n' &&
+            data[i + 2] == '\r' && data[i + 3] == '\n') {
+            return (ssize_t)(i + 4);
+        }
+    }
+
+    return -1;
 }
 
 static int send_html_response(struct bufferevent *bev, struct client_context *ctx,
@@ -450,18 +469,66 @@ int send_dir(struct bufferevent *bev, const char *dirname,
 void conn_readcd(struct bufferevent *bev, void *user_data)
 {
     struct client_context *ctx = user_data;
-    char buf[4096] = {0};
+    struct evbuffer *input;
+    const char *raw_data;
+    char request_buf[MAX_REQUEST_HEADER_SIZE + 1];
     char method[50] = {0};
     char path[4096] = {0};
     char protocol[32] = {0};
-    size_t read_len;
+    char *line_end;
+    size_t inspect_len;
+    size_t input_len;
+    ssize_t header_len;
 
-    read_len = bufferevent_read(bev, buf, sizeof(buf) - 1);
-    if (read_len == 0) {
+    input = bufferevent_get_input(bev);
+    input_len = evbuffer_get_length(input);
+    if (input_len == 0) {
         return;
     }
 
-    if (sscanf(buf, "%49s %4095s %31s", method, path, protocol) != 3) {
+    inspect_len = input_len;
+    if (inspect_len > MAX_REQUEST_HEADER_SIZE) {
+        inspect_len = MAX_REQUEST_HEADER_SIZE;
+    }
+
+    raw_data = (const char *)evbuffer_pullup(input, (ev_ssize_t)inspect_len);
+    if (raw_data == NULL) {
+        log_error_message(ctx, "failed to read request buffer");
+        send_html_response(bev, ctx, 500, "Internal Server Error",
+                           "<html><body><h1>500 Internal Server Error</h1></body></html>");
+        evbuffer_drain(input, input_len);
+        log_access(ctx);
+        return;
+    }
+
+    header_len = find_request_header_end(raw_data, inspect_len);
+    if (header_len < 0 && input_len > MAX_REQUEST_HEADER_SIZE) {
+        if (ctx != NULL) {
+            snprintf(ctx->method, sizeof(ctx->method), "%s", "-");
+            snprintf(ctx->path, sizeof(ctx->path), "%s", "-");
+        }
+        log_error_message(ctx, "request header too large");
+        send_html_response(bev, ctx, 431, "Request Header Fields Too Large",
+                           "<html><body><h1>431 Request Header Fields Too Large</h1></body></html>");
+        evbuffer_drain(input, input_len);
+        log_access(ctx);
+        return;
+    }
+
+    if (header_len < 0) {
+        return;
+    }
+
+    memcpy(request_buf, raw_data, (size_t)header_len);
+    request_buf[header_len] = '\0';
+    evbuffer_drain(input, (size_t)header_len);
+
+    line_end = strstr(request_buf, "\r\n");
+    if (line_end != NULL) {
+        *line_end = '\0';
+    }
+
+    if (sscanf(request_buf, "%49s %4095s %31s", method, path, protocol) != 3) {
         if (ctx != NULL) {
             snprintf(ctx->method, sizeof(ctx->method), "%s", "-");
             snprintf(ctx->path, sizeof(ctx->path), "%s", "-");

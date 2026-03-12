@@ -1,4 +1,13 @@
-#include "total.h"
+#include <arpa/inet.h>
+#include <event2/event.h>
+#include <event2/listener.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "libevent_http.h"
 
 void perr_exit(const char *str)
 {

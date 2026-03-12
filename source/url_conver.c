@@ -1,4 +1,10 @@
-#include "total.h"
+#include <ctype.h>
+#include <dirent.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+
+#include "url_conver.h"
 
 /*
      *charset=iso-8859-1    西欧的编码，说明网站采用的编码是英文；

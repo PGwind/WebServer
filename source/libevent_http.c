@@ -1,4 +1,20 @@
-#include "total.h"
+#include <dirent.h>
+#include <errno.h>
+#include <event2/buffer.h>
+#include <event2/bufferevent.h>
+#include <event2/event.h>
+#include <event2/listener.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "libevent_http.h"
 #include "url_conver.h"
 
 #define HTTP_CLOSE "Connection: close\r\n"

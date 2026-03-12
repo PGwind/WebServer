@@ -1,26 +1,11 @@
 #ifndef _LIBEVENT_HTTP_H
 #define _LIBEVENT_HTTP_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <strings.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <time.h>
-#include <signal.h>
-#include <ctype.h>
-#include <errno.h>
-#include <arpa/inet.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <limits.h>
-#include <event2/listener.h>
-#include <event2/buffer.h>
-#include <event2/bufferevent.h>
-#include <event2/event.h>
+#include <event2/util.h>
+
+struct bufferevent;
+struct evconnlistener;
+struct sockaddr;
 
 void conn_eventcb(struct bufferevent *bev, short events, void *user_data);
 

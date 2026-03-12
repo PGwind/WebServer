@@ -22,10 +22,16 @@ WebServer/
 ├── build/
 │   └── makefile                # 编译脚本
 ├── inc/
-│   ├── libevent_http.h         # HTTP 服务核心声明
+│   ├── libevent_http.h         # 兼容入口头，聚合 HTTP 模块声明
+│   ├── http_common.h           # 连接上下文与日志接口
+│   ├── http_connection.h       # 连接管理与事件回调声明
+│   ├── http_response.h         # HTTP 响应构造声明
+│   ├── directory_listing.h     # 目录页渲染声明
 │   └── url_conver.h            # URL 编解码、文件类型判断
 ├── source/
-│   ├── libevent_http.c         # 网络事件处理、HTTP 响应、目录渲染、访问日志
+│   ├── http_connection.c       # 连接生命周期、请求头读取、访问日志
+│   ├── http_response.c         # HTTP 响应头、错误页、文件发送
+│   ├── directory_listing.c     # 目录遍历、条目格式化、HTML 渲染
 │   ├── main.c                  # 程序入口、监听初始化、事件循环
 │   └── url_conver.c            # 工具函数实现
 ├── tests/
@@ -111,27 +117,21 @@ flowchart TD
 
 你可以把它理解为“控制层 / 启动层”。
 
-## 5.2 `source/libevent_http.c`
+## 5.2 `source/http_connection.c`
 
 职责：
 
 - 处理连接建立与连接关闭
 - 读取 HTTP 请求
-- 解析 URL 并映射到本地文件系统
-- 组织 HTTP 响应头
-- 发送文件内容
-- 生成目录列表页面
-- 返回错误页
+- 管理连接上下文
 - 输出统一访问日志和错误日志
-
-这是项目的核心业务层，最适合面试时重点讲。
 
 关键函数：
 
 - `listener_cb`
   - 接收新连接
   - 创建 `bufferevent`
-  - 注册连接读写回调
+  - 初始化连接上下文
 
 - `conn_readcd`
   - 从 `bufferevent` 输入缓冲中等待完整请求头
@@ -139,6 +139,22 @@ flowchart TD
   - 对过大的请求头返回 `431`
   - 分发到 `response_http`
   - 在请求结束后统一输出访问日志
+
+- `conn_eventcb`
+  - 处理连接错误和连接释放
+
+## 5.3 `source/http_response.c`
+
+职责：
+
+- 解析 URL 并映射到本地文件系统
+- 组织 HTTP 响应头
+- 发送文件内容
+- 返回错误页
+
+这是 HTTP 响应核心模块，负责把“请求结果”变成真正的响应数据。
+
+关键函数：
 
 - `response_http`
   - 路径解码
@@ -157,16 +173,26 @@ flowchart TD
   - 优先使用 `evbuffer_add_file()` 挂接文件到输出缓冲
   - 失败时回退到 `read() + bufferevent_write()`
 
+- `send_error`
+  - 返回内置 404 页面
+
+## 5.4 `source/directory_listing.c`
+
+职责：
+
+- 遍历目录条目
+- 格式化目录项的名称、时间、大小信息
+- 输出带 HTML 转义的目录索引页面
+
+关键函数：
+
 - `send_dir`
   - 使用 `scandir()` 枚举目录
   - 使用 `lstat()` 获取条目元信息
   - 动态拼接带 HTML 转义的目录页面
   - 目录项统一不递归统计文件夹大小
 
-- `send_error`
-  - 返回内置 404 页面
-
-## 5.3 `source/url_conver.c`
+## 5.5 `source/url_conver.c`
 
 职责：
 
@@ -466,7 +492,7 @@ GET /not_found.html HTTP/1.1
 
 1. 先讲清楚项目做了什么
 2. 再讲清楚启动流程和请求流程
-3. 重点熟悉 `main.c`、`libevent_http.c`
+3. 重点熟悉 `main.c`、`http_connection.c`、`http_response.c`
 4. 能说出 `libevent`、`bufferevent`、事件循环分别负责什么
 5. 能说出你做过哪些优化
 6. 能主动说明项目边界和下一步优化方向

@@ -174,7 +174,6 @@ flowchart TD
 - `get_file_type`
   - 根据文件后缀返回 `Content-Type`
 
-- `calculate_folder_size`
   - 递归遍历目录，累加文件大小
 
 这个模块可以理解为“工具层”。

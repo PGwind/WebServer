@@ -64,6 +64,56 @@ static int send_html_response(struct bufferevent *bev, int no, const char *desp,
     return 0;
 }
 
+static void html_escape(const char *src, char *dst, size_t dst_size)
+{
+    size_t written = 0;
+
+    if (dst_size == 0) {
+        return;
+    }
+
+    while (*src != '\0' && written + 1 < dst_size) {
+        const char *replacement = NULL;
+        size_t replacement_len = 0;
+
+        switch (*src) {
+        case '&':
+            replacement = "&amp;";
+            replacement_len = 5;
+            break;
+        case '<':
+            replacement = "&lt;";
+            replacement_len = 4;
+            break;
+        case '>':
+            replacement = "&gt;";
+            replacement_len = 4;
+            break;
+        case '"':
+            replacement = "&quot;";
+            replacement_len = 6;
+            break;
+        case '\'':
+            replacement = "&#39;";
+            replacement_len = 5;
+            break;
+        default:
+            dst[written++] = *src++;
+            continue;
+        }
+
+        if (written + replacement_len >= dst_size) {
+            break;
+        }
+
+        memcpy(dst + written, replacement, replacement_len);
+        written += replacement_len;
+        ++src;
+    }
+
+    dst[written] = '\0';
+}
+
 int response_http(struct bufferevent *bev, const char *method, char *path)
 {
     if (strcasecmp("GET", method) == 0) {
@@ -179,6 +229,8 @@ int send_error(struct bufferevent *bev)
 int send_dir(struct bufferevent *bev, const char *dirname)
 {
     char encode_name[1024];
+    char escaped_dirname[PATH_MAX * 6];
+    char escaped_name[2048];
     char path[PATH_MAX];
     char timestr[64];
     struct stat fs;
@@ -189,10 +241,11 @@ int send_dir(struct bufferevent *bev, const char *dirname)
 
     send_header(bev, 200, "OK", "text/html; charset=utf-8", -1);
 
+    html_escape(dirname, escaped_dirname, sizeof(escaped_dirname));
     snprintf(buf, sizeof(buf),
              "<html><head><meta charset=\"utf-8\"><title>Index of %s</title></head>"
              "<body><h1>Index of %s</h1><table>",
-             dirname, dirname);
+             escaped_dirname, escaped_dirname);
     bufferevent_write(bev, buf, strlen(buf));
 
     num = scandir(dirname, &dirinfo, NULL, alphasort);
@@ -214,41 +267,41 @@ int send_dir(struct bufferevent *bev, const char *dirname)
         }
 
         strencode(encode_name, sizeof(encode_name), dirinfo[i]->d_name);
+        html_escape(dirinfo[i]->d_name, escaped_name, sizeof(escaped_name));
         snprintf(path, sizeof(path), "%s/%s", dirname, dirinfo[i]->d_name);
 
         if (lstat(path, &fs) < 0) {
             snprintf(buf, sizeof(buf),
                      "<tr><td><a href=\"%s\">%s</a></td>"
                      "<td>-</td><td>Unknown</td></tr>\n",
-                     encode_name, dirinfo[i]->d_name);
+                     encode_name, escaped_name);
         } else {
             strftime(timestr, sizeof(timestr), "%d %b %Y %H:%M",
                      localtime(&fs.st_mtime));
 
             if (S_ISDIR(fs.st_mode)) {
-                calculate_folder_size(path, &entry_size);
+                snprintf(size_str, sizeof(size_str), "-");
             } else {
                 entry_size = (unsigned long long)fs.st_size;
-            }
-
-            if (entry_size >= 1024ULL * 1024ULL) {
-                snprintf(size_str, sizeof(size_str), "%.2f MB",
-                         (double)entry_size / (1024.0 * 1024.0));
-            } else {
-                snprintf(size_str, sizeof(size_str), "%.2f KB",
-                         (double)entry_size / 1024.0);
+                if (entry_size >= 1024ULL * 1024ULL) {
+                    snprintf(size_str, sizeof(size_str), "%.2f MB",
+                             (double)entry_size / (1024.0 * 1024.0));
+                } else {
+                    snprintf(size_str, sizeof(size_str), "%.2f KB",
+                             (double)entry_size / 1024.0);
+                }
             }
 
             if (S_ISDIR(fs.st_mode)) {
                 snprintf(buf, sizeof(buf),
                          "<tr><td><a href=\"%s/\">%s/</a></td>"
                          "<td>%s</td><td>%s</td></tr>\n",
-                         encode_name, dirinfo[i]->d_name, timestr, size_str);
+                         encode_name, escaped_name, timestr, size_str);
             } else {
                 snprintf(buf, sizeof(buf),
                          "<tr><td><a href=\"%s\">%s</a></td>"
                          "<td>%s</td><td>%s</td></tr>\n",
-                         encode_name, dirinfo[i]->d_name, timestr, size_str);
+                         encode_name, escaped_name, timestr, size_str);
             }
         }
 

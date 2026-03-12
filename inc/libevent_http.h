@@ -19,14 +19,15 @@ int response_http(struct bufferevent *bev, const char *method, char *path,
                   struct client_context *ctx);
 
 int send_dir(struct bufferevent *bev, const char *dirname,
-             struct client_context *ctx);
+             struct client_context *ctx, int send_body);
 
-int send_error(struct bufferevent *bev, struct client_context *ctx);
+int send_error(struct bufferevent *bev, struct client_context *ctx, int send_body);
 
 int send_file_to_http(const char *filename, struct bufferevent *bev,
-                      struct client_context *ctx);
+                      struct client_context *ctx, int send_body);
 
-int send_header(struct bufferevent *bev, int no, const char* desp, const char *type, long len);
+int send_header(struct bufferevent *bev, int no, const char* desp, const char *type,
+                long len, const char *extra_headers);
 
 void signal_cb(evutil_socket_t sig, short events, void *user_data);
 

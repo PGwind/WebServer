@@ -22,6 +22,8 @@
 
 #define HTTP_CLOSE "Connection: close\r\n"
 #define MAX_REQUEST_HEADER_SIZE 16384
+#define SERVER_HEADER "Server: TinyWeb/libevent\r\n"
+#define ALLOW_GET_HEAD_HEADER "Allow: GET, HEAD\r\n"
 
 struct client_context {
     char client_ip[INET6_ADDRSTRLEN];
@@ -75,6 +77,35 @@ static void get_timestamp(char *buf, size_t buf_size)
 
     localtime_r(&now, &local_tm);
     strftime(buf, buf_size, "%Y-%m-%d %H:%M:%S", &local_tm);
+}
+
+static void format_http_date(time_t when, char *buf, size_t buf_size)
+{
+    struct tm gm_tm;
+
+    if (buf_size == 0) {
+        return;
+    }
+
+    gmtime_r(&when, &gm_tm);
+    strftime(buf, buf_size, "%a, %d %b %Y %H:%M:%S GMT", &gm_tm);
+}
+
+static int request_should_send_body(const char *method)
+{
+    return strcasecmp(method, "HEAD") != 0;
+}
+
+static void build_last_modified_header(time_t mtime, char *buf, size_t buf_size)
+{
+    char http_date[64];
+
+    if (buf_size == 0) {
+        return;
+    }
+
+    format_http_date(mtime, http_date, sizeof(http_date));
+    snprintf(buf, buf_size, "Last-Modified: %s\r\n", http_date);
 }
 
 static void log_error_message(const struct client_context *ctx, const char *fmt, ...)
@@ -188,7 +219,8 @@ static ssize_t find_request_header_end(const char *data, size_t len)
 }
 
 static int send_html_response(struct bufferevent *bev, struct client_context *ctx,
-                              int no, const char *desp, const char *body)
+                              int no, const char *desp, const char *body,
+                              int send_body, const char *extra_headers)
 {
     size_t body_len = strlen(body);
 
@@ -196,8 +228,11 @@ static int send_html_response(struct bufferevent *bev, struct client_context *ct
         ctx->status_code = no;
     }
 
-    send_header(bev, no, desp, "text/html; charset=utf-8", (long)body_len);
-    bufferevent_write(bev, body, body_len);
+    send_header(bev, no, desp, "text/html; charset=utf-8", (long)body_len,
+                extra_headers);
+    if (send_body) {
+        bufferevent_write(bev, body, body_len);
+    }
 
     return 0;
 }
@@ -255,11 +290,14 @@ static void html_escape(const char *src, char *dst, size_t dst_size)
 int response_http(struct bufferevent *bev, const char *method, char *path,
                   struct client_context *ctx)
 {
-    if (strcasecmp("GET", method) == 0) {
+    int send_body = request_should_send_body(method);
+
+    if (strcasecmp("GET", method) == 0 || strcasecmp("HEAD", method) == 0) {
         strdecode(path, path);
         if (!path_is_safe(path)) {
             log_error_message(ctx, "blocked unsafe path=%s", path);
-            send_html_response(bev, ctx, 403, "Forbidden", FORBIDDEN_PAGE);
+            send_html_response(bev, ctx, 403, "Forbidden", FORBIDDEN_PAGE,
+                               send_body, NULL);
             return -1;
         }
 
@@ -272,10 +310,11 @@ int response_http(struct bufferevent *bev, const char *method, char *path,
         if (access(file_path, R_OK) < 0) {
             if (errno == EACCES) {
                 log_errno_message(ctx, "access denied");
-                send_html_response(bev, ctx, 403, "Forbidden", FORBIDDEN_PAGE);
+                send_html_response(bev, ctx, 403, "Forbidden", FORBIDDEN_PAGE,
+                                   send_body, NULL);
             } else {
                 log_errno_message(ctx, "access file failed");
-                send_error(bev, ctx);
+                send_error(bev, ctx, send_body);
             }
             return -1;
         }
@@ -283,7 +322,7 @@ int response_http(struct bufferevent *bev, const char *method, char *path,
         struct stat fs;
         if (stat(file_path, &fs) < 0) {
             log_errno_message(ctx, "stat file failed");
-            send_error(bev, ctx);
+            send_error(bev, ctx, send_body);
             return -1;
         }
 
@@ -291,14 +330,18 @@ int response_http(struct bufferevent *bev, const char *method, char *path,
             if (ctx != NULL) {
                 ctx->status_code = 200;
             }
-            return send_dir(bev, file_path, ctx);
+            return send_dir(bev, file_path, ctx, send_body);
         }
 
         if (ctx != NULL) {
             ctx->status_code = 200;
         }
-        send_header(bev, 200, "OK", get_file_type(file_path), fs.st_size);
-        if (send_file_to_http(file_path, bev, ctx) < 0) {
+        char last_modified_header[96];
+        build_last_modified_header(fs.st_mtime, last_modified_header,
+                                   sizeof(last_modified_header));
+        send_header(bev, 200, "OK", get_file_type(file_path), fs.st_size,
+                    last_modified_header);
+        if (send_file_to_http(file_path, bev, ctx, send_body) < 0) {
             return -1;
         }
     }
@@ -307,7 +350,7 @@ int response_http(struct bufferevent *bev, const char *method, char *path,
 }
 
 int send_file_to_http(const char *filename, struct bufferevent *bev,
-                      struct client_context *ctx)
+                      struct client_context *ctx, int send_body)
 {
     int fd = open(filename, O_RDONLY);
     int ret = 0;
@@ -316,6 +359,11 @@ int send_file_to_http(const char *filename, struct bufferevent *bev,
     if (fd < 0) {
         log_errno_message(ctx, "open file failed");
         return -1;
+    }
+
+    if (!send_body) {
+        close(fd);
+        return 0;
     }
 
     while ((ret = read(fd, buf, sizeof(buf))) > 0) {
@@ -333,12 +381,21 @@ int send_file_to_http(const char *filename, struct bufferevent *bev,
 }
 
 int send_header(struct bufferevent *bev, int no, const char *desp,
-                const char *type, long len)
+                const char *type, long len, const char *extra_headers)
 {
     char buf[256];
+    char date_header[96];
+    char http_date[64];
+    time_t now = time(NULL);
 
     snprintf(buf, sizeof(buf), "HTTP/1.1 %d %s\r\n", no, desp);
     bufferevent_write(bev, buf, strlen(buf));
+
+    format_http_date(now, http_date, sizeof(http_date));
+    snprintf(date_header, sizeof(date_header), "Date: %s\r\n", http_date);
+    bufferevent_write(bev, date_header, strlen(date_header));
+
+    bufferevent_write(bev, SERVER_HEADER, strlen(SERVER_HEADER));
 
     snprintf(buf, sizeof(buf), "Content-Type: %s\r\n", type);
     bufferevent_write(bev, buf, strlen(buf));
@@ -348,15 +405,20 @@ int send_header(struct bufferevent *bev, int no, const char *desp,
         bufferevent_write(bev, buf, strlen(buf));
     }
 
+    if (extra_headers != NULL && extra_headers[0] != '\0') {
+        bufferevent_write(bev, extra_headers, strlen(extra_headers));
+    }
+
     bufferevent_write(bev, HTTP_CLOSE, strlen(HTTP_CLOSE));
     bufferevent_write(bev, "\r\n", 2);
 
     return 0;
 }
 
-int send_error(struct bufferevent *bev, struct client_context *ctx)
+int send_error(struct bufferevent *bev, struct client_context *ctx, int send_body)
 {
     struct stat fs;
+    char last_modified_header[96];
 
     if (ctx != NULL) {
         ctx->status_code = 404;
@@ -365,18 +427,21 @@ int send_error(struct bufferevent *bev, struct client_context *ctx)
     if (access(CUSTOM_404_PATH, R_OK) == 0 &&
         stat(CUSTOM_404_PATH, &fs) == 0 &&
         S_ISREG(fs.st_mode)) {
+        build_last_modified_header(fs.st_mtime, last_modified_header,
+                                   sizeof(last_modified_header));
         send_header(bev, 404, "File Not Found", get_file_type(CUSTOM_404_PATH),
-                    fs.st_size);
-        if (send_file_to_http(CUSTOM_404_PATH, bev, ctx) == 0) {
+                    fs.st_size, last_modified_header);
+        if (send_file_to_http(CUSTOM_404_PATH, bev, ctx, send_body) == 0) {
             return 0;
         }
     }
 
-    return send_html_response(bev, ctx, 404, "File Not Found", NOT_FOUND_PAGE);
+    return send_html_response(bev, ctx, 404, "File Not Found", NOT_FOUND_PAGE,
+                              send_body, NULL);
 }
 
 int send_dir(struct bufferevent *bev, const char *dirname,
-             struct client_context *ctx)
+             struct client_context *ctx, int send_body)
 {
     char encode_name[1024];
     char escaped_dirname[PATH_MAX * 6];
@@ -389,7 +454,11 @@ int send_dir(struct bufferevent *bev, const char *dirname,
     int num;
     char buf[4096];
 
-    send_header(bev, 200, "OK", "text/html; charset=utf-8", -1);
+    send_header(bev, 200, "OK", "text/html; charset=utf-8", -1, NULL);
+
+    if (!send_body) {
+        return 0;
+    }
 
     html_escape(dirname, escaped_dirname, sizeof(escaped_dirname));
     snprintf(buf, sizeof(buf),
@@ -495,7 +564,8 @@ void conn_readcd(struct bufferevent *bev, void *user_data)
     if (raw_data == NULL) {
         log_error_message(ctx, "failed to read request buffer");
         send_html_response(bev, ctx, 500, "Internal Server Error",
-                           "<html><body><h1>500 Internal Server Error</h1></body></html>");
+                           "<html><body><h1>500 Internal Server Error</h1></body></html>",
+                           1, NULL);
         evbuffer_drain(input, input_len);
         log_access(ctx);
         return;
@@ -509,7 +579,8 @@ void conn_readcd(struct bufferevent *bev, void *user_data)
         }
         log_error_message(ctx, "request header too large");
         send_html_response(bev, ctx, 431, "Request Header Fields Too Large",
-                           "<html><body><h1>431 Request Header Fields Too Large</h1></body></html>");
+                           "<html><body><h1>431 Request Header Fields Too Large</h1></body></html>",
+                           1, NULL);
         evbuffer_drain(input, input_len);
         log_access(ctx);
         return;
@@ -535,7 +606,8 @@ void conn_readcd(struct bufferevent *bev, void *user_data)
         }
         log_error_message(ctx, "invalid HTTP request line");
         send_html_response(bev, ctx, 400, "Bad Request",
-                           "<html><body><h1>400 Bad Request</h1></body></html>");
+                           "<html><body><h1>400 Bad Request</h1></body></html>",
+                           1, NULL);
         log_access(ctx);
         return;
     }
@@ -545,11 +617,12 @@ void conn_readcd(struct bufferevent *bev, void *user_data)
         snprintf(ctx->path, sizeof(ctx->path), "%s", path);
     }
 
-    if (strcasecmp(method, "GET") == 0) {
+    if (strcasecmp(method, "GET") == 0 || strcasecmp(method, "HEAD") == 0) {
         response_http(bev, method, path, ctx);
     } else {
         send_html_response(bev, ctx, 405, "Method Not Allowed",
-                           "<html><body><h1>405 Method Not Allowed</h1></body></html>");
+                           "<html><body><h1>405 Method Not Allowed</h1></body></html>",
+                           1, ALLOW_GET_HEAD_HEADER);
     }
 
     log_access(ctx);

@@ -82,7 +82,7 @@ flowchart TD
 4. `conn_readcd` 先从 `bufferevent` 输入缓冲中等待完整请求头
 5. 检测到 `\r\n\r\n` 后，再解析请求行中的 `method`、`path`、`protocol`
 6. 如果请求头超过上限，直接返回 `431`
-7. 如果是 `GET` 请求，进入 `response_http`
+7. 如果是 `GET` 或 `HEAD` 请求，进入 `response_http`
 8. 对 URL 做解码，避免 `%20` 之类路径无法识别
 9. 检查路径是否包含 `..`，拦截路径穿越
 10. 调用 `stat()` 判断目标是文件还是目录
@@ -145,11 +145,13 @@ flowchart TD
   - 安全校验
   - `stat()` 判断资源类型
   - 决定走“文件响应”还是“目录响应”
+  - 对 `HEAD` 只发送响应头，不发送响应体
   - 记录最终状态码
 
 - `send_header`
   - 拼 HTTP 响应头
-  - 负责状态码、Content-Type、Content-Length
+  - 负责状态码、Date、Server、Content-Type、Content-Length
+  - 在需要时补充 `Allow`、`Last-Modified`
 
 - `send_file_to_http`
   - 循环 `read()` 文件内容
@@ -204,10 +206,13 @@ flowchart TD
 这个项目并没有实现完整 HTTP 服务器，而是实现了一个“最小可用子集”：
 
 - 支持 `GET`
+- 支持 `HEAD`
 - 在完整请求头到达后解析请求行
 - 返回状态行
+- 返回 `Date`、`Server`
 - 返回 `Content-Type`
 - 返回 `Content-Length`
+- 对文件返回 `Last-Modified`
 - 返回实体内容
 
 这在面试里是加分点，因为你能明确知道项目边界，而不是把它说成“完整 Web 框架”。
@@ -251,8 +256,23 @@ GET /README.md HTTP/1.1
 1. `conn_readcd` 解析得到 `GET` 和 `/README.md`
 2. `response_http` 将路径映射为 `README.md`
 3. `stat()` 判断这是普通文件
-4. `send_header()` 写入响应头
+4. `send_header()` 写入状态行、`Date`、`Server`、`Content-Type`、`Content-Length`，并附带 `Last-Modified`
 5. `send_file_to_http()` 分块读取并发送文件
+
+### 7.1.1 请求 HEAD
+
+浏览器访问：
+
+```text
+HEAD /README.md HTTP/1.1
+```
+
+处理过程：
+
+1. `conn_readcd` 解析得到 `HEAD` 和 `/README.md`
+2. `response_http` 仍然执行路径校验和 `stat()`
+3. `send_header()` 返回与 `GET` 一致的关键响应头
+4. 不发送文件内容本体
 
 ### 7.2 请求目录
 
@@ -336,7 +356,7 @@ GET /not_found.html HTTP/1.1
 
 - 修复了文件发送时未处理 `open/read` 失败的问题
 - 增加了请求行解析失败时的 `400` 响应
-- 增加了非 `GET` 方法的 `405` 响应
+- 增加了非 `GET/HEAD` 方法的 `405` 响应
 - 只有在收到完整的 `\r\n\r\n` 请求头后才开始解析，避免半包直接 `sscanf`
 - 对过大的请求头增加 `431` 保护
 - 参数校验更严格，端口必须在合法范围内
@@ -355,6 +375,7 @@ GET /not_found.html HTTP/1.1
 - 去掉了写死的 404 绝对路径依赖
 - 增加了基础 `smoke test` 脚本，方便服务器端快速回归
 - 增加统一访问日志和错误日志，便于服务器排障
+- 响应头增加 `Date`、`Server`、`Allow`、`Last-Modified`，更接近正常 HTTP 服务器行为
 
 ### 9.4 功能正确性优化
 
@@ -367,7 +388,7 @@ GET /not_found.html HTTP/1.1
 
 目前项目还存在这些边界：
 
-- 只支持 `GET`，不支持 `POST`、`PUT`
+- 只支持 `GET`、`HEAD`，不支持 `POST`、`PUT`
 - HTTP 请求解析仍然较简单，还没有逐项解析和校验 Header 字段
 - 没有 Keep-Alive 长连接复用
 - 没有配置文件
@@ -427,7 +448,7 @@ GET /not_found.html HTTP/1.1
 
 ## 12. 一段适合面试直接背的项目介绍
 
-> 这是一个基于 C 语言和 libevent 实现的轻量级静态 WebServer。整体采用事件驱动模型，主流程是 main 初始化事件循环和监听器，新连接进入 listener 回调后通过 bufferevent 处理读事件，请求解析后根据 URL 映射本地文件或目录。对于普通文件返回 HTTP 头和文件内容，对于目录则动态生成带 HTML 转义的索引页，同时输出统一访问日志。我在这个项目里主要关注了 HTTP 最小实现、文件系统访问、URL 编解码、路径安全校验，以及 Linux 服务器上的构建和部署流程。
+> 这是一个基于 C 语言和 libevent 实现的轻量级静态 WebServer。整体采用事件驱动模型，主流程是 main 初始化事件循环和监听器，新连接进入 listener 回调后通过 bufferevent 处理读事件，请求解析后根据 URL 映射本地文件或目录。它现在支持 `GET` 和 `HEAD`，对于普通文件返回更完整的 HTTP 响应头和文件内容，对于目录则动态生成带 HTML 转义的索引页，同时输出统一访问日志。我在这个项目里主要关注了 HTTP 最小实现、文件系统访问、URL 编解码、路径安全校验，以及 Linux 服务器上的构建和部署流程。
 
 ## 13. 学习建议
 

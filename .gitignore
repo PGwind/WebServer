@@ -2,3 +2,5 @@ AGENTS.md
 start.sh
 server
 *.dSYM/
+.DS_Store
+plan.txt

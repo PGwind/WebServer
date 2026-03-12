@@ -4,3 +4,4 @@ server
 *.dSYM/
 .DS_Store
 plan.txt
+.vscode/

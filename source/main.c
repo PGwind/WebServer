@@ -9,12 +9,14 @@
 
 #include "libevent_http.h"
 
+/* 输出系统错误并终止进程，供启动阶段的致命错误复用。 */
 void perr_exit(const char *str)
 {
 	perror(str);
 	exit(1);
 }
 
+/* 程序入口：校验参数、切换资源目录、初始化监听与事件循环。 */
 int main(int argc, char **argv)
 {
     char *endptr = NULL;

@@ -21,6 +21,7 @@
 
 static const char ALLOW_GET_HEAD_HEADER[] = "Allow: GET, HEAD\r\n";
 
+/* 生成本地时间字符串，统一日志里的时间格式。 */
 static void get_timestamp(char *buf, size_t buf_size)
 {
     time_t now = time(NULL);
@@ -34,6 +35,7 @@ static void get_timestamp(char *buf, size_t buf_size)
     strftime(buf, buf_size, "%Y-%m-%d %H:%M:%S", &local_tm);
 }
 
+/* 输出错误日志，并在有连接上下文时带上客户端 IP。 */
 void log_error_message(const struct client_context *ctx, const char *fmt, ...)
 {
     char timestamp[32];
@@ -54,6 +56,7 @@ void log_error_message(const struct client_context *ctx, const char *fmt, ...)
     fputc('\n', stderr);
 }
 
+/* 输出进程级信息日志，用于启动、退出等非请求场景。 */
 void log_info_message(const char *fmt, ...)
 {
     char timestamp[32];
@@ -69,11 +72,13 @@ void log_info_message(const char *fmt, ...)
     fputc('\n', stdout);
 }
 
+/* 把 errno 翻译成可读错误信息，统一错误日志输出格式。 */
 void log_errno_message(const struct client_context *ctx, const char *action)
 {
     log_error_message(ctx, "%s: %s", action, strerror(errno));
 }
 
+/* 输出访问日志，记录一个请求最终的处理结果。 */
 void log_access(const struct client_context *ctx)
 {
     char timestamp[32];
@@ -100,6 +105,7 @@ void log_access(const struct client_context *ctx)
             timestamp, client_ip, method, path, ctx->status_code);
 }
 
+/* 从 sockaddr 中提取客户端 IP，兼容 IPv4 和 IPv6。 */
 static void fill_client_ip(const struct sockaddr *sa, char *buf, size_t buf_size)
 {
     void *addr_ptr = NULL;
@@ -126,6 +132,7 @@ static void fill_client_ip(const struct sockaddr *sa, char *buf, size_t buf_size
     }
 }
 
+/* 在输入缓冲中查找 HTTP 请求头结束标记 \r\n\r\n。 */
 static ssize_t find_request_header_end(const char *data, size_t len)
 {
     size_t i;
@@ -144,6 +151,7 @@ static ssize_t find_request_header_end(const char *data, size_t len)
     return -1;
 }
 
+/* 连接读回调：等待完整请求头、解析请求行并分发到响应层。 */
 void conn_readcd(struct bufferevent *bev, void *user_data)
 {
     struct client_context *ctx = user_data;
@@ -237,6 +245,7 @@ void conn_readcd(struct bufferevent *bev, void *user_data)
     log_access(ctx);
 }
 
+/* 连接事件回调：处理错误、EOF 等事件并释放连接资源。 */
 void conn_eventcb(struct bufferevent *bev, short events, void *user_data)
 {
     struct client_context *ctx = user_data;
@@ -249,6 +258,7 @@ void conn_eventcb(struct bufferevent *bev, short events, void *user_data)
     free(ctx);
 }
 
+/* 信号回调：收到 SIGINT 后触发事件循环的延迟退出。 */
 void signal_cb(evutil_socket_t sig, short events, void *user_data)
 {
     struct event_base *base = user_data;
@@ -261,6 +271,7 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data)
     event_base_loopexit(base, &delay);
 }
 
+/* 监听回调：接受新连接并为其创建 bufferevent 与上下文。 */
 void listener_cb(struct evconnlistener *listener,
                  evutil_socket_t fd, struct sockaddr *sa, int socklen,
                  void *user_data)

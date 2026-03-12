@@ -12,6 +12,7 @@
 #include "http_response.h"
 #include "url_conver.h"
 
+/* 对目录名和文件名做 HTML 转义，避免目录页被特殊字符破坏。 */
 static void html_escape(const char *src, char *dst, size_t dst_size)
 {
     size_t written = 0;
@@ -62,6 +63,7 @@ static void html_escape(const char *src, char *dst, size_t dst_size)
     dst[written] = '\0';
 }
 
+/* 遍历目录并动态生成目录索引页。 */
 int send_dir(struct bufferevent *bev, const char *dirname,
              struct client_context *ctx, int send_body)
 {

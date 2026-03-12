@@ -17,6 +17,7 @@
      *以下是依据传递进来的文件名，使用后缀判断是何种文件类型
      *将对应的文件类型按照http定义的关键字发送回去
 */
+/* 根据文件后缀推断响应使用的 MIME 类型。 */
 const char *get_file_type(const char *name)
 {
     char* dot;
@@ -67,6 +68,7 @@ const char *get_file_type(const char *name)
  * %25 '%' %26 '&' %27 ''' %28 '('......
  * 相关知识html中的‘ ’(space)是&nbsp
  */
+/* 把 %xx 形式的 URL 编码解码为普通字符串。 */
 void strdecode(char *to, char *from)
 {
     for ( ; *from != '\0'; ++to, ++from)
@@ -86,7 +88,7 @@ void strdecode(char *to, char *from)
     *to = '\0';
 }
 
-//16进制数转化为10进制, return 0不会出现
+/* 把单个十六进制字符转成十进制值。 */
 int hexit(char c)
 {
     if (c >= '0' && c <= '9')
@@ -99,8 +101,7 @@ int hexit(char c)
     return 0;
 }
 
-// "编码"，用作回写浏览器的时候，将除字母数字及/_.-~以外的字符转义后回写。
-// strencode(encoded_name, sizeof(encoded_name), name);
+/* 把目录项名称编码回 URL 安全格式，供目录页链接使用。 */
 void strencode(char* to, size_t tosize, const char* from)
 {
     int tolen;

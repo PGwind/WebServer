@@ -29,6 +29,7 @@ static const char FORBIDDEN_PAGE[] =
     "<body><h1>403 Forbidden</h1><p>Path traversal is not allowed.</p>"
     "</body></html>";
 
+/* 检查路径分段中是否包含 ..，阻止基础路径穿越。 */
 static int path_is_safe(const char *path)
 {
     const char *segment = path;
@@ -51,6 +52,7 @@ static int path_is_safe(const char *path)
     return 1;
 }
 
+/* 把时间格式化成 HTTP 头常用的 GMT 日期字符串。 */
 static void format_http_date(time_t when, char *buf, size_t buf_size)
 {
     struct tm gm_tm;
@@ -63,11 +65,13 @@ static void format_http_date(time_t when, char *buf, size_t buf_size)
     strftime(buf, buf_size, "%a, %d %b %Y %H:%M:%S GMT", &gm_tm);
 }
 
+/* 判断当前请求方法是否应该返回响应体。 */
 static int request_should_send_body(const char *method)
 {
     return strcasecmp(method, "HEAD") != 0;
 }
 
+/* 生成 Last-Modified 响应头，供文件和自定义 404 页面复用。 */
 static void build_last_modified_header(time_t mtime, char *buf, size_t buf_size)
 {
     char http_date[64];
@@ -80,6 +84,7 @@ static void build_last_modified_header(time_t mtime, char *buf, size_t buf_size)
     snprintf(buf, buf_size, "Last-Modified: %s\r\n", http_date);
 }
 
+/* 发送一个完整的 HTML 响应，常用于错误页和简单文本页面。 */
 int send_html_response(struct bufferevent *bev, struct client_context *ctx,
                        int no, const char *desp, const char *body,
                        int send_body, const char *extra_headers)
@@ -99,6 +104,7 @@ int send_html_response(struct bufferevent *bev, struct client_context *ctx,
     return 0;
 }
 
+/* 处理 GET/HEAD 请求，把 URL 映射为文件或目录并返回结果。 */
 int response_http(struct bufferevent *bev, const char *method, char *path,
                   struct client_context *ctx)
 {
@@ -166,6 +172,7 @@ int response_http(struct bufferevent *bev, const char *method, char *path,
     return 0;
 }
 
+/* 发送文件内容，优先使用 evbuffer_add_file，提高大文件输出效率。 */
 int send_file_to_http(const char *filename, struct bufferevent *bev,
                       struct client_context *ctx, int send_body)
 {
@@ -212,6 +219,7 @@ int send_file_to_http(const char *filename, struct bufferevent *bev,
     return 0;
 }
 
+/* 构造并发送通用 HTTP 响应头。 */
 int send_header(struct bufferevent *bev, int no, const char *desp,
                 const char *type, long len, const char *extra_headers)
 {
@@ -247,6 +255,7 @@ int send_header(struct bufferevent *bev, int no, const char *desp,
     return 0;
 }
 
+/* 返回 404：优先发送自定义 404 页面，失败时回退到内置 HTML。 */
 int send_error(struct bufferevent *bev, struct client_context *ctx, int send_body)
 {
     struct stat fs;
